@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Planer Ataków Szlachciców</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; }
+    label { display: block; margin-top: 10px; }
+    select, input[type=date] { margin-top: 5px; padding: 5px; font-size: 14px; }
+    .attack-entry {
+      display: flex; align-items: center; gap: 10px; margin-top: 8px;
+      border-bottom: 1px solid #ddd; padding-bottom: 5px;
+    }
+    .attack-entry > * {
+      vertical-align: middle;
+    }
+    button { margin-top: 15px; padding: 8px 12px; font-size: 14px; }
+    textarea { margin-top: 20px; width: 100%; height: 200px; font-family: monospace; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<h2>Planer Ataków Szlachciców</h2>
+
+<label>Data wejścia:
+  <input type="date" id="entry-date" />
+</label>
+
+<label>Godzina wejścia:
+  <select id="entry-hour"></select> :
+  <select id="entry-minute"></select> :
+  <select id="entry-second"></select>
+</label>
+
+
+<h3>Czasy marszu ataków</h3>
+<div id="attacks"></div>
+<button onclick="addAttack()">Dodaj atak</button>
+<button onclick="removeSelected()">Usuń zaznaczone ataki</button>
+
+<h3>Harmonogram ataków</h3>
+<button onclick="calculate()">Oblicz harmonogram</button>
+<button onclick="resetAll()">Resetuj wszystko</button>
+<textarea id="output" readonly></textarea>
+
+<script>
+// Wypełnianie selectów z godzinami, minutami i sekundami
+function fillTimeSelect(select, max) {
+  for (let i = 0; i <= max; i++) {
+    let option = document.createElement('option');
+    option.value = i;
+    option.textContent = i.toString().padStart(2, '0');
+    select.appendChild(option);
+  }
+}
+
+// Inicjalizacja wyboru czasu wejścia
+const entryHour = document.getElementById('entry-hour');
+const entryMinute = document.getElementById('entry-minute');
+const entrySecond = document.getElementById('entry-second');
+
+fillTimeSelect(entryHour, 23);
+fillTimeSelect(entryMinute, 59);
+fillTimeSelect(entrySecond, 59);
+
+// Kontener na ataki
+const attacksDiv = document.getElementById('attacks');
+
+// Dodawanie ataku z czasem marszu hh:mm:ss (domyślnie 00:01:00)
+function addAttack(h=0,m=1,s=0) {
+  const div = document.createElement('div');
+  div.className = 'attack-entry';
+
+  // Checkbox do wyboru ataku do usunięcia
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+
+  // Selecty dla godzin, minut i sekund marszu
+  const hourSel = document.createElement('select');
+  const minSel = document.createElement('select');
+  const secSel = document.createElement('select');
+
+  fillTimeSelect(hourSel, 23);
+  fillTimeSelect(minSel, 59);
+  fillTimeSelect(secSel, 59);
+
+  hourSel.value = h;
+  minSel.value = m;
+  secSel.value = s;
+
+  div.appendChild(checkbox);
+  div.appendChild(document.createTextNode(' Marsz: '));
+  div.appendChild(hourSel);
+  div.appendChild(document.createTextNode(' : '));
+  div.appendChild(minSel);
+  div.appendChild(document.createTextNode(' : '));
+  div.appendChild(secSel);
+
+  attacksDiv.appendChild(div);
+}
+
+// Usuwanie zaznaczonych ataków
+function removeSelected() {
+  const children = [...attacksDiv.children];
+  for(let div of children) {
+    const cb = div.querySelector('input[type=checkbox]');
+    if(cb && cb.checked) {
+      attacksDiv.removeChild(div);
+    }
+  }
+}
+
+// Kalkulacja i wyświetlanie wyników
+function calculate() {
+  const dateStr = document.getElementById('entry-date').value;
+  if (!dateStr) {
+    alert("Proszę wybrać datę wejścia");
+    return;
+  }
+
+  const h = parseInt(entryHour.value);
+  const m = parseInt(entryMinute.value);
+  const s = parseInt(entrySecond.value);
+  
+  // Data i czas wejścia bazowego
+  const baseDate = new Date(`${dateStr}T${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`);
+
+  // Offset między atakami - zawsze 60 sekund
+  const offset = 60 * 1000;
+
+  let output = "";
+
+  const attackDivs = [...attacksDiv.children];
+  if (attackDivs.length === 0) {
+    alert("Dodaj przynajmniej jeden atak.");
+    return;
+  }
+
+  const firstAttackOffset = 60 * 1000;
+
+  attackDivs.forEach((div, i) => {
+    const selects = div.querySelectorAll('select');
+    const marszH = parseInt(selects[0].value);
+    const marszM = parseInt(selects[1].value);
+    const marszS = parseInt(selects[2].value);
+
+    // Czas marszu ataku w ms
+    const marchTimeMs = ((marszH*3600) + (marszM*60) + marszS)*1000;
+
+    // Czas wejścia ataku - bazowa data + offset między atakami (pierwszy zawsze +60s)
+    const entryTime = new Date(baseDate.getTime() + firstAttackOffset + i*offset);
+
+    // Czas wysłania ataku - wejście minus marsz
+    const sendTime = new Date(entryTime.getTime() - marchTimeMs);
+
+    // Formatowanie daty w 'YYYY-MM-DD HH:mm:ss'
+    function formatDate(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth()+1).padStart(2,'0') + '-' +
+        String(d.getDate()).padStart(2,'0') + ' ' +
+        String(d.getHours()).padStart(2,'0') + ':' +
+        String(d.getMinutes()).padStart(2,'0') + ':' +
+        String(d.getSeconds()).padStart(2,'0');
+    }
+
+    output += `Szlachcic #${i+1}: WYŚLIJ o ${formatDate(sendTime)} (wejście: ${formatDate(entryTime)})\n`;
+  });
+
+  document.getElementById('output').value = output;
+}
+
+// Reset całego formularza
+function resetAll() {
+  document.getElementById('entry-date').value = '';
+  entryHour.value = 0;
+  entryMinute.value = 0;
+  entrySecond.value = 0;
+
+  attacksDiv.innerHTML = '';
+  document.getElementById('output').value = '';
+
+  // Dodaj domyślny atak (marsz 00:01:00)
+  addAttack(0,1,0);
+}
+
+// Inicjalizacja - dodaj jeden atak domyślnie
+resetAll();
+</script>
+
+</body>
+</html>
