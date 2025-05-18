@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="pl">
 <head>
   <meta charset="UTF-8" />
@@ -6,7 +5,7 @@
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; }
     label { display: block; margin-top: 10px; }
-    select, input[type=date] { margin-top: 5px; padding: 5px; font-size: 14px; }
+    select, input[type=date], input[type=number] { margin-top: 5px; padding: 5px; font-size: 14px; }
     .attack-entry {
       display: flex; align-items: center; gap: 10px; margin-top: 8px;
       border-bottom: 1px solid #ddd; padding-bottom: 5px;
@@ -32,6 +31,10 @@
   <select id="entry-second"></select>
 </label>
 
+<label>
+  Odstęp między atakami (w sekundach):
+  <input type="number" id="attack-offset" min="1" value="60" />
+</label>
 
 <h3>Czasy marszu ataków</h3>
 <div id="attacks"></div>
@@ -125,8 +128,13 @@ function calculate() {
   // Data i czas wejścia bazowego
   const baseDate = new Date(`${dateStr}T${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`);
 
-  // Offset między atakami - zawsze 60 sekund
-  const offset = 60 * 1000;
+  // Pobierz odstęp między atakami z inputa
+  let offsetSeconds = parseInt(document.getElementById('attack-offset').value);
+  if (isNaN(offsetSeconds) || offsetSeconds < 1) {
+    alert("Odstęp między atakami musi być liczbą całkowitą większą niż 0");
+    return;
+  }
+  const offset = offsetSeconds * 1000;
 
   let output = "";
 
@@ -136,8 +144,8 @@ function calculate() {
     return;
   }
 
-  const firstAttackOffset = 60 * 1000;
-
+  // Pierwszy atak startuje dokładnie po offsetzie (czyli offset między wejściem a pierwszym atakiem)
+  // Kolejne co offset dalej
   attackDivs.forEach((div, i) => {
     const selects = div.querySelectorAll('select');
     const marszH = parseInt(selects[0].value);
@@ -147,8 +155,8 @@ function calculate() {
     // Czas marszu ataku w ms
     const marchTimeMs = ((marszH*3600) + (marszM*60) + marszS)*1000;
 
-    // Czas wejścia ataku - bazowa data + offset między atakami (pierwszy zawsze +60s)
-    const entryTime = new Date(baseDate.getTime() + firstAttackOffset + i*offset);
+    // Czas wejścia ataku - bazowa data + offset*(i+1)
+    const entryTime = new Date(baseDate.getTime() + offset * (i + 1));
 
     // Czas wysłania ataku - wejście minus marsz
     const sendTime = new Date(entryTime.getTime() - marchTimeMs);
@@ -178,6 +186,9 @@ function resetAll() {
 
   attacksDiv.innerHTML = '';
   document.getElementById('output').value = '';
+  
+  // Ustaw domyślny odstęp na 60 sekund
+  document.getElementById('attack-offset').value = 60;
 
   // Dodaj domyślny atak (marsz 00:01:00)
   addAttack(0,1,0);
@@ -189,3 +200,4 @@ resetAll();
 
 </body>
 </html>
+
